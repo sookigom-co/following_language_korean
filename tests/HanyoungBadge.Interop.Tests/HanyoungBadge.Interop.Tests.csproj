@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!--
+    App 은 net8.0-windows(WinExe)라 net8.0 테스트에서 참조할 수 없다. 대신 순수 값 타입인
+    구조체 정의 파일을 링크해 "실제 프로덕션 레이아웃"을 Linux/net8.0 에서 직접 검증한다.
+    (v0.3.0: 리매핑 제거로 SendInput 용 InputStructs 및 self-injection 마커 검증은 삭제됨.)
+  -->
+  <ItemGroup>
+    <!-- SOO-1252: UpdateLayeredWindow(per-pixel alpha)용 POINT/SIZE/BLENDFUNCTION 레이아웃 회귀 검증 -->
+    <Compile Include="..\..\src\HanyoungBadge.App\Interop\LayeredWindowStructs.cs" Link="Interop\LayeredWindowStructs.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>HanyoungBadge.App</RootNamespace>
+    <AssemblyName>HanyoungKeyRemap</AssemblyName>
+    <Version>0.4.3</Version>
+    <FileVersion>0.4.3.0</FileVersion>
+    <AssemblyVersion>0.4.3.0</AssemblyVersion>
+
+    <!-- 보더 제공 아이콘(assets/ico.ico, SHA256 2acd5926...). exe 리소스 + 바로가기 아이콘에 사용. -->
+    <ApplicationIcon>..\..\assets\ico.ico</ApplicationIcon>
+
+    <!-- Linux 에서 net8.0-windows/WinForms 를 크로스 컴파일하기 위해 필요 -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!-- 단일 exe self-contained 배포 기본값 (publish 시 -r/-p 로도 지정) -->
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HanyoungBadge.Core\HanyoungBadge.Core.csproj" />
+  </ItemGroup>
+
+</Project>
