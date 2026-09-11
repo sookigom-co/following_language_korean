@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  v0.4.3 설치기 빌드 (Linux 크로스 빌드)  [SOO-1277]
+#  v2.0.0 설치기 빌드 (Linux 크로스 빌드)  [SOO-1277]
 #
 #  1) dotnet publish -r win-x64 단일 exe (아이콘 리소스 포함)
 #  2) makensis 로 installer exe 생성
 #  3) installer exe + SHA256 매니페스트 출력
 #
 #  사전 요구: dotnet 8 SDK (~/.dotnet), makensis(NSIS), icoutils(검증용)
-#  사용: installer/build.sh [VERSION]   (기본 0.4.3)
+#  사용: installer/build.sh [VERSION]   (기본 2.0.0)
 # ============================================================================
 set -euo pipefail
 
-VERSION="${1:-0.4.3}"
+VERSION="${1:-2.0.0}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PUBLISH_DIR="$REPO_ROOT/publish"
 DIST_DIR="$REPO_ROOT/dist"

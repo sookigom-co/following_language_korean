@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ko</string>
+	<key>CFBundleExecutable</key>
+	<string>HanyoungBadgeApp</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.sookigom.HanyoungBadge</string>
+	<!-- 번들 아이콘. Scripts/build-app.sh 가 Resources/AppIcon.icns 를 번들 안으로 복사한다.
+	     CFBundleIconFile 은 확장자 없는 이름(구형 키), CFBundleIconName 은 같은 이름의 신형 키다.
+	     둘 다 두는 이유: 에셋 카탈로그 없이 .icns 를 직접 넣는 구성에서 Finder·Dock·정보 창이
+	     참조하는 키가 macOS 버전마다 다르기 때문. -->
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>HanyoungBadge</string>
+	<key>CFBundleDisplayName</key>
+	<string>입력 언어 배지</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.0.0</string>
+	<!-- 빌드 출처(provenance) 자리. Scripts/build-app.sh 가 번들 사본에만 git SHA 를 써넣고
+	     원본인 이 파일은 건드리지 않는다. 스크립트를 거치지 않고 만든 번들은 아래 값이 그대로
+	     남아 AppDelegate 가 '출처 불명' 으로 표시한다 — 가짜 빌드 번호를 남기지 않기 위함. -->
+	<key>CFBundleVersion</key>
+	<string>unknown</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<!-- 메뉴 막대 전용 상주 앱: Dock 아이콘·앱 전환기에 노출하지 않는다. -->
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>© sookigom-co</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+</dict>
+</plist>

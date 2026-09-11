@@ -1,5 +1,5 @@
 ; ============================================================================
-;  HanyoungKeyRemap (입력 언어 배지 오버레이) — NSIS 설치기  [v0.4.3, SOO-1277]
+;  HanyoungKeyRemap (입력 언어 배지 오버레이) — NSIS 설치기  [v2.0.0, SOO-1277]
 ; ----------------------------------------------------------------------------
 ;  기능:
 ;    - 항상 관리자 권한으로 설치(RequestExecutionLevel admin)
@@ -12,14 +12,14 @@
 ;    - 언인스톨러: 태스크 삭제 + 파일/바로가기/앱 데이터 정리
 ;
 ;  Linux 크로스 빌드:
-;    makensis -DVERSION=0.4.3 -DSRCDIR=<publish_dir> installer/HanyoungKeyRemap.nsi
+;    makensis -DVERSION=2.0.0 -DSRCDIR=<publish_dir> installer/HanyoungKeyRemap.nsi
 ;  (기본값은 리포 레이아웃 기준 상대경로 — installer/build.sh 참조)
 ; ============================================================================
 
 Unicode true
 
 !ifndef VERSION
-  !define VERSION "0.4.3"
+  !define VERSION "2.0.0"
 !endif
 
 ; 설치할 exe 가 있는 디렉터리(dotnet publish 결과). build.sh 가 -DSRCDIR 로 넘긴다.

@@ -21,3 +21,8 @@ Thumbs.db
 
 # v0.4.0 설치기 빌드 산출물
 dist/
+
+# Swift Package Manager (macos/)
+.build/
+.swiftpm/
+macos/dist/

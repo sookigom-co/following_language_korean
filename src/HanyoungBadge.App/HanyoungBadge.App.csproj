@@ -9,9 +9,9 @@
     <Nullable>enable</Nullable>
     <RootNamespace>HanyoungBadge.App</RootNamespace>
     <AssemblyName>HanyoungKeyRemap</AssemblyName>
-    <Version>0.4.3</Version>
-    <FileVersion>0.4.3.0</FileVersion>
-    <AssemblyVersion>0.4.3.0</AssemblyVersion>
+    <Version>2.0.0</Version>
+    <FileVersion>2.0.0.0</FileVersion>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
 
     <!-- 보더 제공 아이콘(assets/ico.ico, SHA256 2acd5926...). exe 리소스 + 바로가기 아이콘에 사용. -->
     <ApplicationIcon>..\..\assets\ico.ico</ApplicationIcon>
