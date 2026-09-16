@@ -25,7 +25,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.0.0</string>
+	<string>2.1.0</string>
 	<!-- 빌드 출처(provenance) 자리. Scripts/build-app.sh 가 번들 사본에만 git SHA 를 써넣고
 	     원본인 이 파일은 건드리지 않는다. 스크립트를 거치지 않고 만든 번들은 아래 값이 그대로
 	     남아 AppDelegate 가 '출처 불명' 으로 표시한다 — 가짜 빌드 번호를 남기지 않기 위함. -->

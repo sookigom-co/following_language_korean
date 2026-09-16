@@ -41,14 +41,47 @@ build_slice() {
     local arch="${1:-}"
     local bin_dir
     if [[ -n "$arch" ]]; then
-        echo "==> swift build -c release --arch $arch" >&2
-        if ! swift build -c release --arch "$arch" >&2; then
+        # 왜 아키텍처마다 `--scratch-path` 를 따로 주는가 (SOO-1338):
+        #
+        # SwiftPM 은 산출물 디렉터리는 트리플별로 나누지만(`.build/arm64-apple-macosx/`,
+        # `.build/x86_64-apple-macosx/`), llbuild 빌드 데이터베이스는 **scratch 루트에
+        # `build.db` 하나만** 두고 모든 트리플이 공유한다. 아래 슬라이스 루프가 같은 `.build`
+        # 에서 arm64 → x86_64 순으로 두 번 빌드하므로, 이전 실행이 x86_64 까지 마치고 남긴
+        # `build.db` 와 이번 실행의 arm64 빌드가 충돌한다. 명령 키가 x86_64 절대경로로
+        # 등록돼 있어서 이런 오류로 죽는다:
+        #
+        #   error: command .../.build/x86_64-apple-macosx/release/swift-version--....txt not registered
+        #
+        # arm64 를 빌드하는데 오류 경로가 x86_64 를 가리키는 것이 곧 진단이다.
+        # **첫 실행은 성공하고 두 번째 실행부터 실패**한다 — 보더 실기에서 재현됐다(SOO-1333 스레드).
+        #
+        # 매번 `.build` 를 통째로 지우는 방식은 쓰지 않는다. 증분 빌드를 버려 빌드 시간이
+        # 두 배가 되고, 재발 원인(db 공유) 자체는 그대로 남는다. scratch 를 나누면 슬라이스마다
+        # 자기 `build.db` 를 갖게 되어 서로를 볼 일이 없다.
+        #
+        # 인자 없는 네이티브 경로는 기본 `.build` 를 그대로 쓴다. 슬라이스가 전용 scratch 로
+        # 빠진 뒤에는 기본 `.build` 를 오염시키는 주체가 없으므로, 개발 중 `swift build`/
+        # `swift test` 의 증분 캐시를 그대로 재사용할 수 있다.
+        local scratch="$PACKAGE_DIR/.build/slice-$arch"
+        echo "==> swift build -c release --arch $arch (scratch: .build/slice-$arch)" >&2
+        if ! swift build -c release --arch "$arch" --scratch-path "$scratch" >&2; then
             echo "오류: '$arch' 슬라이스 빌드에 실패했습니다." >&2
+            # 레거시 `.build` 안내 (SOO-1339). 위 scratch 격리는 **앞으로의** 빌드만 분리한다.
+            # 이 수정 이전 버전으로 유니버설 빌드를 한 번이라도 돌린 환경에는 기본 `.build` 의
+            # `build.db` 에 옛 슬라이스 명령 키가 그대로 남아 있어서, 수정본으로도 첫 실행이
+            # `... not registered` 로 죽는다. 그 경우 최초 1회 정리가 필요하다.
+            #
+            # 자동으로 지우지 않는 이유: `.build/<triple>/` 만 보고 "옛 슬라이스 잔재" 와
+            # "정상 네이티브 빌드 산출물" 을 구분할 방법이 없어, 자동 청소는 멀쩡한 증분
+            # 캐시를 말없이 날린다. 사용자에게 알려주고 선택하게 하는 쪽이 맞다.
+            echo "      'not registered' 오류라면 이 수정 이전에 만들어진 .build 가 남아 있는 것입니다." >&2
+            echo "      최초 1회만 정리하면 됩니다:" >&2
+            echo "        rm -rf \"$PACKAGE_DIR/.build\"   # 저장소 루트 기준: rm -rf macos/.build" >&2
             echo "      유니버설이 꼭 필요하지 않다면 현재 아키텍처만 빌드할 수 있습니다:" >&2
             echo "        ./Scripts/build-app.sh            (또는 ./Scripts/make-dmg.sh --no-universal)" >&2
             return 1
         fi
-        bin_dir="$(swift build -c release --arch "$arch" --show-bin-path)"
+        bin_dir="$(swift build -c release --arch "$arch" --scratch-path "$scratch" --show-bin-path)"
     else
         echo "==> swift build -c release" >&2
         swift build -c release >&2

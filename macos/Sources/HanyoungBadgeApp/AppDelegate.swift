@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var showBadgeItem: NSMenuItem?
     private var launchAtLoginItem: NSMenuItem?
+    private var positionItems: [NSMenuItem] = []
+    private var cursorOffsetItem: NSMenuItem?
 
     /// 이 실행 파일이 어느 커밋으로 빌드됐는지.
     ///
@@ -43,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 실제 시스템 등록 상태를 신뢰원으로 삼는다(설정 파일과 어긋나면 시스템 쪽을 따른다).
         settings.launchAtLogin = LoginItem.isEnabled
         syncMenuState()
+        applyLayoutSettings()
 
         if settings.showBadge {
             overlay.start()
@@ -107,6 +110,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
+        // 배지 위치(8방향) — 항목 순서·이름은 코어의 `BadgeAnchor.menuOrder` / `displayName` 를
+        // 그대로 따른다. 여기서 목록을 다시 적으면 Linux 테스트가 못 보는 두 번째 진실원이 생긴다.
+        let positionItem = NSMenuItem(title: "배지 위치", action: nil, keyEquivalent: "")
+        let positionMenu = NSMenu()
+        positionItems = BadgeAnchor.menuOrder.map { anchor in
+            let item = NSMenuItem(title: anchor.displayName, action: #selector(selectBadgePosition(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = anchor.rawValue
+            positionMenu.addItem(item)
+            return item
+        }
+        positionItem.submenu = positionMenu
+        menu.addItem(positionItem)
+
+        let offsetItem = NSMenuItem(
+            title: "커서와의 간격…",
+            action: #selector(editCursorOffset),
+            keyEquivalent: ""
+        )
+        offsetItem.target = self
+        menu.addItem(offsetItem)
+        cursorOffsetItem = offsetItem
+
+        menu.addItem(.separator())
+
         // 빌드 출처 — 실기 QA 보고를 어느 커밋에 귀속시킬지 되짚기 위한 읽기 전용 표시.
         // 클릭 대상이 아니므로 action 없이 비활성으로 둔다(비활성이어도 제목은 읽힌다).
         let buildItem = NSMenuItem(title: "빌드 \(Self.buildIdentifier)", action: nil, keyEquivalent: "")
@@ -125,6 +153,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showBadgeItem?.state = settings.showBadge ? .on : .off
         launchAtLoginItem?.state = settings.launchAtLogin ? .on : .off
         statusItem?.button?.appearsDisabled = !settings.showBadge
+
+        for item in positionItems {
+            let anchor = (item.representedObject as? String).flatMap(BadgeAnchor.init(rawValue:))
+            item.state = anchor == settings.badgePosition ? .on : .off
+        }
+        // 현재 간격을 항목 제목에 함께 보여 준다(대화상자를 열지 않고도 확인 가능).
+        cursorOffsetItem?.title = "커서와의 간격… (\(settings.badgeCursorOffset)pt)"
+    }
+
+    /// 저장된 배치 설정을 오버레이에 밀어 넣는다(재시작 없이 즉시 반영).
+    private func applyLayoutSettings() {
+        overlay.apply(anchor: settings.badgePosition, cursorOffset: Double(settings.badgeCursorOffset))
     }
 
     // MARK: - 메뉴 동작
@@ -153,6 +193,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.launchAtLogin = desired
         settingsStore.save(settings)
         syncMenuState()
+    }
+
+    @objc private func selectBadgePosition(_ sender: NSMenuItem) {
+        guard let anchor = (sender.representedObject as? String).flatMap(BadgeAnchor.init(rawValue:)),
+              anchor != settings.badgePosition
+        else { return }
+
+        settings.badgePosition = anchor
+        settingsStore.save(settings)
+        syncMenuState()
+        applyLayoutSettings()
+    }
+
+    @objc private func editCursorOffset() {
+        let range = OverlayLayout.cursorOffsetRange
+
+        let alert = NSAlert()
+        alert.messageText = "커서와의 간격"
+        alert.informativeText = "배지를 커서에서 얼마나 떨어뜨릴지 정합니다(\(range.lowerBound)–\(range.upperBound)pt)."
+        alert.addButton(withTitle: "확인")
+        alert.addButton(withTitle: "취소")
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
+        field.stringValue = String(settings.badgeCursorOffset)
+        field.placeholderString = "\(range.lowerBound)–\(range.upperBound)"
+        field.alignment = .right
+        field.setAccessibilityLabel("커서와의 간격(포인트)")
+        alert.accessoryView = field
+        // 대화상자가 뜨자마자 값을 고쳐 쓸 수 있도록 입력란에 포커스를 준다.
+        alert.window.initialFirstResponder = field
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        // 숫자가 아니거나 범위를 벗어난 입력은 조용히 무시한다(기존 값 유지).
+        // 판정 규칙은 코어(`OverlayLayout.parseCursorOffset`)에 있어 Linux 테스트로 검증된다.
+        guard let value = OverlayLayout.parseCursorOffset(field.stringValue) else { return }
+        guard value != settings.badgeCursorOffset else { return }
+
+        settings.badgeCursorOffset = value
+        settingsStore.save(settings)
+        syncMenuState()
+        applyLayoutSettings()
     }
 
     @objc private func quit() {

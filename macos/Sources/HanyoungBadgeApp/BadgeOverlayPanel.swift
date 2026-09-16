@@ -95,12 +95,21 @@ final class BadgeOverlayPanel: NSPanel {
         badgeView.language = language
     }
 
-    /// 커서 위치에 맞춰 배지를 재배치한다(커서 **우측 상단**, 화면 밖으로 넘치면 클램프).
-    func reposition(cursor: NSPoint, screens: [NSScreen]) {
+    /// 커서 위치에 맞춰 배지를 재배치한다(설정된 앵커·간격, 화면 밖으로 넘치면 클램프).
+    ///
+    /// 산식은 전부 `OverlayLayout`(코어)에 있고 여기서는 AppKit 타입만 변환한다 — 배치 규칙이
+    /// AppKit 쪽으로 새면 Linux 테스트가 검증하지 못한다.
+    func reposition(
+        cursor: NSPoint,
+        screens: [NSScreen],
+        anchor: BadgeAnchor = OverlayLayout.defaultAnchor,
+        offset: Double = OverlayLayout.defaultCursorOffset
+    ) {
         let frame = OverlayLayout.badgeFrame(
             cursor: BadgePoint(x: Double(cursor.x), y: Double(cursor.y)),
             size: OverlayLayout.defaultBadgeSize,
-            offset: OverlayLayout.defaultCursorOffset,
+            anchor: anchor,
+            offset: offset,
             screens: screens.map {
                 BadgeRect(
                     x: Double($0.visibleFrame.minX),

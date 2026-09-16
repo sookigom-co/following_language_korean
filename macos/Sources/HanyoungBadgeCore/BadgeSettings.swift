@@ -11,16 +11,41 @@ public struct BadgeSettings: Codable, Sendable, Equatable {
     /// 로그인 시 자동 실행 여부(`SMAppService.mainApp`).
     public var launchAtLogin: Bool
 
-    public init(showBadge: Bool = true, launchAtLogin: Bool = false) {
+    /// 배지가 커서 기준 어느 방향에 붙을지(SOO-1332). 기본값은 SOO-1288 의 우측 상단.
+    public var badgePosition: BadgeAnchor
+
+    /// 커서와 배지 사이 간격(포인트). 허용 범위는 `OverlayLayout.cursorOffsetRange`.
+    public var badgeCursorOffset: Int
+
+    public init(
+        showBadge: Bool = true,
+        launchAtLogin: Bool = false,
+        badgePosition: BadgeAnchor = OverlayLayout.defaultAnchor,
+        badgeCursorOffset: Int = Int(OverlayLayout.defaultCursorOffset)
+    ) {
         self.showBadge = showBadge
         self.launchAtLogin = launchAtLogin
+        self.badgePosition = badgePosition
+        self.badgeCursorOffset = badgeCursorOffset
     }
 
     /// 누락된 키는 기본값으로 채운다(예전 버전 설정 파일 호환).
+    ///
+    /// 배치 관련 두 필드는 값이 **깨져 있어도 해당 필드만** 기본값으로 떨어뜨린다.
+    /// 예전 버전이 모르는 위치 문자열을 남겼거나 사용자가 파일을 손으로 고쳐 범위를 벗어난
+    /// 간격을 넣었다는 이유로 배지 표시·자동시작 같은 다른 설정까지 초기화되면 안 되기 때문이다
+    /// (`FileSettingsStore.load()` 는 디코딩이 던지면 설정 **전체**를 기본값으로 갈아엎는다).
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         showBadge = try container.decodeIfPresent(Bool.self, forKey: .showBadge) ?? true
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
+
+        let rawPosition: String? = (try? container.decodeIfPresent(String.self, forKey: .badgePosition)) ?? nil
+        badgePosition = rawPosition.flatMap(BadgeAnchor.init(rawValue:)) ?? OverlayLayout.defaultAnchor
+
+        let rawOffset: Int? = (try? container.decodeIfPresent(Int.self, forKey: .badgeCursorOffset)) ?? nil
+        badgeCursorOffset = rawOffset.flatMap { OverlayLayout.cursorOffsetRange.contains($0) ? $0 : nil }
+            ?? Int(OverlayLayout.defaultCursorOffset)
     }
 }
 

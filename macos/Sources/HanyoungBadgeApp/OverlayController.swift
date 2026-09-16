@@ -30,6 +30,30 @@ final class OverlayController {
     private var renderedLanguage: InputLanguage = .unknown
     private var running = false
 
+    /// 현재 적용 중인 배치(사용자 설정). 메뉴에서 바뀌면 `apply(anchor:cursorOffset:)` 로 갱신된다.
+    private var anchor: BadgeAnchor = OverlayLayout.defaultAnchor
+    private var cursorOffset: Double = OverlayLayout.defaultCursorOffset
+
+    /// 배치 설정을 바꾸고 **즉시** 화면에 반영한다(앱 재시작 불필요).
+    ///
+    /// 패널이 떠 있을 때는 다음 커서 추적 틱을 기다리지 않고 바로 옮긴다. 커서가 멈춰 있으면
+    /// `trackCursor()` 가 위치 변화 없음으로 조기 반환하므로, 이 즉시 재배치가 없으면 사용자는
+    /// 마우스를 흔들기 전까지 설정이 먹지 않은 것처럼 느낀다.
+    func apply(anchor: BadgeAnchor, cursorOffset: Double) {
+        self.anchor = anchor
+        self.cursorOffset = cursorOffset
+
+        guard running, panel.isVisible else { return }
+        let cursor = NSEvent.mouseLocation
+        lastCursor = cursor
+        reposition(cursor: cursor)
+    }
+
+    /// 현재 배치 설정으로 패널을 옮긴다(호출부가 앵커·간격을 알 필요가 없게 한 단일 경로).
+    private func reposition(cursor: NSPoint) {
+        panel.reposition(cursor: cursor, screens: NSScreen.screens, anchor: anchor, offset: cursorOffset)
+    }
+
     /// 오버레이를 켠다(타이머 가동 + 입력 소스 변경 구독).
     func start() {
         guard !running else { return }
@@ -85,7 +109,7 @@ final class OverlayController {
         let cursor = NSEvent.mouseLocation
         if let last = lastCursor, last == cursor { return }
         lastCursor = cursor
-        panel.reposition(cursor: cursor, screens: NSScreen.screens)
+        reposition(cursor: cursor)
     }
 
     /// 입력 소스를 조회해 배지 언어를 갱신한다. 조회 실패(`nil`)면 직전 상태를 유지한다.
@@ -103,7 +127,7 @@ final class OverlayController {
 
         let cursor = NSEvent.mouseLocation
         lastCursor = cursor
-        panel.reposition(cursor: cursor, screens: NSScreen.screens)
+        reposition(cursor: cursor)
 
         // 레벨 트리거: 화면에 실제 반영된 언어와 목표가 다를 때만 다시 그린다.
         // 한 번의 렌더 누락이 영구 고착으로 굳지 않는다(Windows 판 D2-a 자가치유와 동일 취지).

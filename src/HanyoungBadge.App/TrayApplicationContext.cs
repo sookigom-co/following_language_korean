@@ -29,7 +29,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (diagMode)
             AppLog.Info("[DIAG] 진단 보조 모드 시작 (--diag): 배지 틱 카운터 활성.");
 
-        _overlay = new LanguageOverlayForm(_diag);
+        _overlay = new LanguageOverlayForm(_diag, _settings);
 
         // [v0.4.1] 트레이 아이콘을 앱 exe 리소스(ApplicationIcon = assets/ico.ico)에서 추출한다.
         // 별도 ico 파일 배포 없이 exe 에 임베드된 아이콘을 재사용해 파일 이중 배포를 피한다.
@@ -95,6 +95,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void ApplyOverlayState()
     {
+        // [SOO-1333] 배치 설정(위치·간격)을 먼저 오버레이에 밀어 넣어 재시작 없이 즉시 반영한다.
+        _overlay.ApplySettings(_settings);
+
         if (_settings.ShowLanguageOverlay)
             _overlay.Begin();
         else

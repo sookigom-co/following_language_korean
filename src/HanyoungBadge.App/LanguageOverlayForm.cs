@@ -28,11 +28,11 @@ namespace HanyoungBadge.App;
 /// </summary>
 internal sealed class LanguageOverlayForm : Form
 {
-    // 96dpi 기준 배지 크기·오프셋. 실제 값은 모니터 DPI 로 스케일한다.
+    // 96dpi 기준 배지 크기. 실제 값은 모니터 DPI 로 스케일한다.
+    // [SOO-1333] 커서 오프셋 상수(BaseCursorOffsetX/Y)는 사용자 설정
+    // (AppSettings.BadgePosition/BadgeCursorOffset)으로 대체되어 제거했다.
     private const int BaseBadgeWidth = 26;
     private const int BaseBadgeHeight = 22;
-    private const int BaseCursorOffsetX = 16;
-    private const int BaseCursorOffsetY = 18;
 
     // 커서 추적(≈30Hz)과 IME 폴링(≈200ms)을 분리한다(D1).
     private readonly System.Windows.Forms.Timer _cursorTimer;
@@ -64,9 +64,16 @@ internal sealed class LanguageOverlayForm : Form
     private Size _size;
     private uint _lastDpi = 96;
 
-    public LanguageOverlayForm(DiagnosticsState diag)
+    // [SOO-1333] 커서 기준 배치 설정. 배치 산식 자체는 Core(BadgePlacement)에 있고 여기서는
+    // DPI 스케일 적용과 호출만 한다. 설정 변경은 ApplySettings 로 재시작 없이 즉시 반영된다.
+    private BadgePosition _position;
+    private int _cursorOffset;
+
+    public LanguageOverlayForm(DiagnosticsState diag, AppSettings settings)
     {
         _diag = diag;
+        _position = settings.BadgePosition;
+        _cursorOffset = settings.BadgeCursorOffset;
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
@@ -81,6 +88,27 @@ internal sealed class LanguageOverlayForm : Form
 
         _pollTimer = new System.Windows.Forms.Timer { Interval = 200 }; // IME 상태 폴링(단독 갱신 경로)
         _pollTimer.Tick += (_, _) => PollAndRender();
+    }
+
+    /// <summary>
+    /// [SOO-1333] 배치 설정(위치·간격)을 즉시 반영한다. 앱 재시작이 필요 없도록 설정 저장 직후
+    /// 호출한다. 표시 중이면 현재 커서 기준으로 곧바로 재배치하고, 숨김 상태여도 커서 캐시를
+    /// 무효화해 다음 추적 틱(≈33ms)에서 반드시 재계산되게 한다.
+    /// </summary>
+    public void ApplySettings(AppSettings settings)
+    {
+        _position = settings.BadgePosition;
+        _cursorOffset = settings.BadgeCursorOffset;
+
+        // 커서가 움직이지 않아도 재계산하도록 위치 캐시를 무효화한다(TrackCursor 의 동일좌표 조기반환 회피).
+        _lastCursor = new POINT { X = int.MinValue, Y = int.MinValue };
+
+        if (!_visible || !GetCursorPos(out var cursor))
+            return;
+
+        _lastCursor = cursor;
+        _currentPos = ComputePosition(cursor, _lastDpi, _size);
+        MoveTo(_currentPos);
     }
 
     /// <summary>오버레이 표시를 시작한다(추적·폴링 타이머 가동).</summary>
@@ -134,7 +162,7 @@ internal sealed class LanguageOverlayForm : Form
             return;
 
         _lastCursor = cursor;
-        _currentPos = ClampToScreen(cursor, _lastDpi, _size);
+        _currentPos = ComputePosition(cursor, _lastDpi, _size);
         MoveTo(_currentPos);
     }
 
@@ -177,7 +205,7 @@ internal sealed class LanguageOverlayForm : Form
         }
 
         _lastCursor = cursor;
-        _currentPos = ClampToScreen(cursor, _lastDpi, _size);
+        _currentPos = ComputePosition(cursor, _lastDpi, _size);
 
         bool languageChanged = language != previous;
         if (languageChanged)
@@ -253,20 +281,20 @@ internal sealed class LanguageOverlayForm : Form
             (int)Math.Round(BaseBadgeHeight * scale));
     }
 
-    private Point ClampToScreen(POINT cursor, uint dpi, Size size)
+    /// <summary>
+    /// [SOO-1333] 커서 좌표 → 배지 원점. 산식과 화면 클램프는 전부 Core 의
+    /// <see cref="BadgePlacement.Compute"/> 가 담당하고, 여기서는 사용자 지정 간격의 DPI 스케일과
+    /// 작업 영역 조회(WinForms <c>Screen</c>)만 한다.
+    /// </summary>
+    private Point ComputePosition(POINT cursor, uint dpi, Size size)
     {
-        double scale = dpi / 96.0;
-        int offsetX = (int)Math.Round(BaseCursorOffsetX * scale);
-        int offsetY = (int)Math.Round(BaseCursorOffsetY * scale);
-
-        var desired = new Point(cursor.X + offsetX, cursor.Y + offsetY);
+        int offset = BadgePlacement.ScaleForDpi(_cursorOffset, dpi);
         var bounds = Screen.FromPoint(new Point(cursor.X, cursor.Y)).WorkingArea;
+        var area = new BadgeArea(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
 
-        int x = Math.Min(desired.X, bounds.Right - size.Width);
-        int y = Math.Min(desired.Y, bounds.Bottom - size.Height);
-        x = Math.Max(x, bounds.Left);
-        y = Math.Max(y, bounds.Top);
-        return new Point(x, y);
+        var origin = BadgePlacement.Compute(
+            cursor.X, cursor.Y, size.Width, size.Height, _position, offset, area);
+        return new Point(origin.X, origin.Y);
     }
 
     // --- 표시 상태 관리 (UpdateLayeredWindow 기반, WinForms Show/Hide 미사용) ---

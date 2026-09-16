@@ -108,4 +108,122 @@ public class JsonSettingsStoreTests : IDisposable
         Assert.True(settings.RunAtStartup);        // 살아남은 필드 보존
         Assert.False(settings.ShowLanguageOverlay); // 알 수 없는 MappedKey/Enabled 는 조용히 무시
     }
+
+    // --- [SOO-1333] 배지 위치·간격 ---
+
+    [Fact]
+    public void Load_WhenBadgeFieldsMissing_KeepsLegacyBottomRightDefaults()
+    {
+        // 기존 사용자의 settings.json 에는 새 필드가 없다 → 현행 우하단/16 동작이 유지되어야 한다.
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(_path, "{ \"RunAtStartup\": false, \"ShowLanguageOverlay\": true }");
+        var store = new JsonSettingsStore(_path);
+
+        var settings = store.Load();
+
+        Assert.Equal(BadgePosition.BottomRight, settings.BadgePosition);
+        Assert.Equal(16, settings.BadgeCursorOffset);
+    }
+
+    [Fact]
+    public void SaveThenLoad_RoundTripsBadgePlacementFields()
+    {
+        var store = new JsonSettingsStore(_path);
+
+        store.Save(new AppSettings { BadgePosition = BadgePosition.TopLeft, BadgeCursorOffset = 40 });
+        var loaded = store.Load();
+
+        Assert.Equal(BadgePosition.TopLeft, loaded.BadgePosition);
+        Assert.Equal(40, loaded.BadgeCursorOffset);
+    }
+
+    [Fact]
+    public void Save_WritesBadgePositionAsReadableString()
+    {
+        var store = new JsonSettingsStore(_path);
+
+        store.Save(new AppSettings { BadgePosition = BadgePosition.Top });
+
+        Assert.Contains("\"BadgePosition\": \"Top\"", File.ReadAllText(_path));
+    }
+
+    [Fact]
+    public void Load_WhenBadgePositionUnknown_FallsBackOnlyThatFieldAndKeepsOthers()
+    {
+        // 핵심 회귀: 표준 JsonStringEnumConverter 라면 여기서 JsonException → 설정 "전체" 리셋이었다.
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(_path,
+            "{ \"RunAtStartup\": true, \"ShowLanguageOverlay\": false, " +
+            "\"BadgePosition\": \"MiddleOfNowhere\", \"BadgeCursorOffset\": 40 }");
+        var store = new JsonSettingsStore(_path);
+
+        var settings = store.Load();
+
+        Assert.Equal(BadgePosition.BottomRight, settings.BadgePosition); // 이 필드만 기본값
+        Assert.True(settings.RunAtStartup);                              // 나머지는 보존
+        Assert.False(settings.ShowLanguageOverlay);
+        Assert.Equal(40, settings.BadgeCursorOffset);
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("201")]
+    [InlineData("999999")]
+    public void Load_WhenBadgeCursorOffsetOutOfRange_FallsBackOnlyThatFieldAndKeepsOthers(string rawOffset)
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(_path,
+            "{ \"RunAtStartup\": true, \"ShowLanguageOverlay\": false, " +
+            $"\"BadgePosition\": \"Left\", \"BadgeCursorOffset\": {rawOffset} }}");
+        var store = new JsonSettingsStore(_path);
+
+        var settings = store.Load();
+
+        Assert.Equal(16, settings.BadgeCursorOffset);            // 이 필드만 기본값
+        Assert.Equal(BadgePosition.Left, settings.BadgePosition); // 나머지는 보존
+        Assert.True(settings.RunAtStartup);
+        Assert.False(settings.ShowLanguageOverlay);
+    }
+
+    [Fact]
+    public void Load_WhenBadgeFieldTypesAreWrong_FallsBackOnlyThoseFields()
+    {
+        // 손으로 편집하다 타입이 깨져도(불리언/객체) 나머지 설정을 잃지 않아야 한다.
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(_path,
+            "{ \"RunAtStartup\": true, \"ShowLanguageOverlay\": false, " +
+            "\"BadgePosition\": { \"x\": 1 }, \"BadgeCursorOffset\": true }");
+        var store = new JsonSettingsStore(_path);
+
+        var settings = store.Load();
+
+        Assert.Equal(BadgePosition.BottomRight, settings.BadgePosition);
+        Assert.Equal(16, settings.BadgeCursorOffset);
+        Assert.True(settings.RunAtStartup);
+        Assert.False(settings.ShowLanguageOverlay);
+    }
+
+    [Fact]
+    public void BadgeCursorOffset_RejectsOutOfRangeAssignment()
+    {
+        var settings = new AppSettings { BadgeCursorOffset = 201 };
+        Assert.Equal(16, settings.BadgeCursorOffset);
+
+        settings.BadgeCursorOffset = 200;
+        Assert.Equal(200, settings.BadgeCursorOffset);
+
+        settings.BadgeCursorOffset = -5;
+        Assert.Equal(16, settings.BadgeCursorOffset);
+    }
+
+    [Fact]
+    public void Clone_CopiesBadgePlacementFields()
+    {
+        var original = new AppSettings { BadgePosition = BadgePosition.BottomLeft, BadgeCursorOffset = 33 };
+
+        var clone = original.Clone();
+
+        Assert.Equal(BadgePosition.BottomLeft, clone.BadgePosition);
+        Assert.Equal(33, clone.BadgeCursorOffset);
+    }
 }
