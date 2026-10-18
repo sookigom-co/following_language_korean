@@ -38,17 +38,17 @@ jobs:
     name: dotnet test + win-x64 publish
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # SDK 버전은 global.json(8.0.0 / rollForward latestFeature)을 단일 소스로 쓴다.
       - name: .NET SDK 설정
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       # packages.lock.json 이 없어 setup-dotnet 내장 캐시를 쓸 수 없다. csproj 해시로 직접 캐싱.
       - name: NuGet 패키지 캐시
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
@@ -75,7 +75,7 @@ jobs:
 
       # Windows 동작 확인은 Linux CI 에서 불가능하다. 수동 QA 가 내려받을 수 있게 올려둔다.
       - name: win-x64 exe 업로드 (수동 QA 용)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: HanyoungKeyRemap-win-x64-${{ github.sha }}
           path: publish/HanyoungKeyRemap.exe
@@ -85,11 +85,17 @@ jobs:
   swift:
     name: swift test (macos/ 코어)
     runs-on: ubuntu-latest
-    # Package.swift 의 swift-tools-version(5.9)과 같은 버전을 공식 이미지로 고정한다.
     # macOS 전용 실행 타깃은 조건부 컴파일로 비게 되므로 Mac 없이 코어 테스트만 돌아간다.
-    container: swift:5.9-jammy
+    #
+    # 왜 Package.swift 의 swift-tools-version(5.9)보다 높은 6.x 인가:
+    # LanguageBadge.swift 가 쓰는 `Locale.Language`(ICU 스크립트 최대화)는 Linux 에서
+    # Swift 6.0 의 Foundation 재작성(swift-foundation)부터 제공된다. 5.9 의
+    # swift-corelibs-foundation 에는 없어서 `type 'Locale' has no member 'Language'`
+    # 로 컴파일이 깨진다(CI run 39140001628 에서 실측). 6.x 로 올려야 Mac 없이
+    # 코어를 검증할 수 있다. 서드파티 setup 액션 대신 공식 이미지로 버전을 고정한다.
+    container: swift:6.4-jammy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: swift test
         working-directory: macos
@@ -99,9 +105,9 @@ jobs:
     name: 아이콘 재현성 확인
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -120,10 +126,10 @@ jobs:
     needs: [dotnet]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: .NET SDK 설정
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -148,7 +154,7 @@ jobs:
           installer/build.sh "$tag_version"
 
       - name: 설치기 + SHA256 매니페스트 업로드
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: HanyoungKeyRemap-Setup-${{ github.ref_name }}
           path: |
