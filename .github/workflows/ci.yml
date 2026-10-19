@@ -1,0 +1,170 @@
+# ============================================================================
+#  CI — PR 템플릿의 검증 항목을 사람 체크박스 대신 자동으로 돌린다  [SOO-27]
+#
+#  러너는 ubuntu-latest 하나로 전부 커버한다(Windows/macOS 러너 불필요).
+#    · dotnet    : EnableWindowsTargeting 으로 net8.0-windows 를 크로스 빌드 →
+#                  `dotnet test` + win-x64 self-contained 단일 exe publish
+#    · swift     : macos/ 코어 로직을 공식 swift 컨테이너에서 `swift test`.
+#                  AppKit/Carbon 코드는 전부 `#if os(macOS)` 라 Linux 에서 제외된다.
+#    · icons     : 커밋된 아이콘이 make-icons.py 재생성 결과와 바이트 동일한지 확인
+#    · installer : 릴리스 태그(v*) 푸시에만 NSIS 설치기 빌드. PR 에서는 돌지 않는다.
+#
+#  배포 산출물 정책 (보드 확정, SOO-27):
+#    Windows 산출물은 여기서 빌드해 아티팩트로 전달한다.
+#    macOS 산출물(.app / .dmg)은 CI 에 넣지 않고 Mac 에서 빌드해 전달한다 —
+#    macos/Scripts/build-app.sh 와 make-dmg.sh 는 `uname -s != Darwin` 이면
+#    즉시 종료하며(codesign · hdiutil 이 macOS 전용) ubuntu 러너로는 만들 수 없다.
+#    아래 swift 잡은 산출물 빌드가 아니라 코어 로직 회귀 검증이며 둘은 별개다.
+#
+#  여기 쓰인 명령은 SOO-26 에서 Linux 환경 실측으로 통과를 확인한 것과 동일하다.
+# ============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # PR 은 새 푸시가 오면 이전 실행을 취소한다. main/태그 실행은 끝까지 남긴다.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  dotnet:
+    name: dotnet test + win-x64 publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # SDK 버전은 global.json 을 단일 소스로 쓴다(8.0.100 / rollForward latestFeature).
+      - name: .NET SDK 설정
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # packages.lock.json 이 없어 setup-dotnet 내장 캐시를 쓸 수 없다. csproj 해시로 직접 캐싱.
+      - name: NuGet 패키지 캐시
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: dotnet test (PR 템플릿 검증 항목 1)
+        run: dotnet test HanyoungBadge.sln -c Release -p:EnableWindowsTargeting=true
+
+      - name: dotnet publish win-x64 단일 exe (PR 템플릿 검증 항목 2)
+        run: |
+          dotnet publish src/HanyoungBadge.App/HanyoungBadge.App.csproj \
+            -c Release -r win-x64 --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:EnableWindowsTargeting=true \
+            -p:EnableCompressionInSingleFile=true \
+            -o publish
+
+      # 빌드가 통과해도 산출물이 Windows 실행 파일이 아니면 의미가 없다. PE32+ 까지 확인한다.
+      - name: 산출물이 win-x64 PE 실행 파일인지 확인
+        run: |
+          test -f publish/HanyoungKeyRemap.exe
+          file publish/HanyoungKeyRemap.exe
+          file publish/HanyoungKeyRemap.exe | grep -q 'PE32+'
+
+      # Windows 동작 확인은 Linux CI 에서 불가능하다. 수동 QA 가 내려받을 수 있게 올려둔다.
+      - name: win-x64 exe 업로드 (수동 QA 용)
+        uses: actions/upload-artifact@v7
+        with:
+          name: HanyoungKeyRemap-win-x64-${{ github.sha }}
+          path: publish/HanyoungKeyRemap.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  swift:
+    name: swift test (macos/ 코어)
+    runs-on: ubuntu-latest
+    # macOS 전용 실행 타깃은 조건부 컴파일로 비게 되므로 Mac 없이 코어 테스트만 돌아간다.
+    #
+    # 왜 Package.swift 의 swift-tools-version(5.9)보다 높은 6.x 인가:
+    # LanguageBadge.swift 가 쓰는 `Locale.Language`(ICU 스크립트 최대화)는 Linux 에서
+    # Swift 6.0 의 Foundation 재작성(swift-foundation)부터 제공된다. 5.9 의
+    # swift-corelibs-foundation 에는 없어서 `type 'Locale' has no member 'Language'`
+    # 로 컴파일이 깨진다(CI run 39140001628 에서 실측). 6.x 로 올려야 Mac 없이
+    # 코어를 검증할 수 있다. 서드파티 setup 액션 대신 공식 이미지로 버전을 고정한다.
+    container: swift:6.4-jammy
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: swift test
+        working-directory: macos
+        run: swift test
+
+  icons:
+    name: 아이콘 재현성 확인
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # Pillow 버전을 고정하지 않는 이유: make-icons.py 가 optimize 등 버전 의존 옵션을
+      # 의도적으로 쓰지 않아 최신 Pillow 에서도 동일 바이트가 나온다(13.0.0 로 실측).
+      # 혹시 미래 Pillow 가 출력 바이트를 바꾸면 이 잡이 그 사실을 알려주는 신호가 된다.
+      - name: Pillow 설치
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: make-icons.py --check
+        run: python macos/Scripts/make-icons.py --check
+
+  installer:
+    name: NSIS 설치기 빌드 (릴리스 태그 전용)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [dotnet]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: .NET SDK 설정
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # icoutils 는 build.sh 의 wrestool 아이콘 리소스 검증 단계에 쓰인다(없으면 경고만).
+      - name: NSIS / icoutils 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nsis icoutils
+
+      # 버전은 태그(refs/tags/vX.Y.Z)에서 뽑아 넘긴다. 저장소에 버전 단일 출처 파일
+      # (VERSION, SOO-28)이 생기면 태그와 그 파일이 어긋난 릴리스를 여기서 먼저 잡는다.
+      - name: 설치기 빌드
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ -f VERSION ]; then
+            file_version="$(tr -d '[:space:]' < VERSION)"
+            if [ "$tag_version" != "$file_version" ]; then
+              echo "ERROR: 태그 버전($tag_version)과 VERSION 파일($file_version)이 다릅니다." >&2
+              exit 1
+            fi
+          fi
+          installer/build.sh "$tag_version"
+
+      - name: 설치기 + SHA256 매니페스트 업로드
+        uses: actions/upload-artifact@v7
+        with:
+          name: HanyoungKeyRemap-Setup-${{ github.ref_name }}
+          path: |
+            dist/*.exe
+            dist/*.sha256
+          if-no-files-found: error
