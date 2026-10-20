@@ -9,9 +9,9 @@
     <Nullable>enable</Nullable>
     <RootNamespace>HanyoungBadge.App</RootNamespace>
     <AssemblyName>HanyoungKeyRemap</AssemblyName>
-    <Version>2.1.0</Version>
-    <FileVersion>2.1.0.0</FileVersion>
-    <AssemblyVersion>2.1.0.0</AssemblyVersion>
+
+    <!-- Version/FileVersion/AssemblyVersion 은 여기에 적지 않는다.
+         저장소 루트 Directory.Build.props 가 루트 VERSION 파일에서 읽어 내려 준다. [SOO-28] -->
 
     <!-- 보더 제공 아이콘(assets/ico.ico, SHA256 2acd5926...). exe 리소스 + 바로가기 아이콘에 사용. -->
     <ApplicationIcon>..\..\assets\ico.ico</ApplicationIcon>

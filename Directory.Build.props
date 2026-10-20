@@ -1,0 +1,37 @@
+<Project>
+
+  <!-- ==========================================================================
+       제품 버전의 단일 출처(single source of truth)  [SOO-28]
+
+       버전은 저장소 루트의 `VERSION` 파일 한 곳에만 적는다. 여기서 읽어
+       모든 프로젝트의 Version/FileVersion/AssemblyVersion 으로 내려 주므로
+       csproj 에는 버전을 다시 쓰지 않는다.
+
+       MSBuild 가 아니라 평문 파일을 출처로 둔 이유: 이 저장소는 .NET(csproj) ·
+       NSIS(.nsi) · bash(installer/, macos/Scripts/) · macOS plist 가 섞여 있다.
+       추가 도구 없이 어느 쪽에서도 읽히는 형태는 평문 한 줄 파일뿐이다.
+       버전을 MSBuild 속성으로만 들고 있으면 설치기 스크립트가 XML 을 파싱해야 한다.
+
+       `VERSION` 이 없거나 읽히지 않으면 MSBuild 평가 단계에서 즉시 실패한다.
+       0.0.0 같은 기본값으로 조용히 빌드되는 것보다 낫다 — 그 조용한 불일치가
+       바로 이 태스크가 막으려는 문제다.
+
+       `RepoVersion` 을 외부에서 주면(`-p:RepoVersion=x.y.z`) 파일 대신 그 값을 쓴다.
+       릴리스 경로는 이 훅을 쓰지 않는다 — `installer/build.sh` 가 인자로 받은 임시
+       버전으로 시험 빌드할 때만 쓴다. 그 훅이 없으면 설치기 쪽 버전만 인자로 바뀌고
+       exe 안의 어셈블리 버전은 파일 값이 남아, 한 산출물 안에서 두 버전이 어긋난다.
+       ========================================================================== -->
+  <PropertyGroup Condition="'$(RepoVersion)' == ''">
+    <RepoVersionFile>$(MSBuildThisFileDirectory)VERSION</RepoVersionFile>
+    <_RepoVersionRaw>$([System.IO.File]::ReadAllText('$(RepoVersionFile)'))</_RepoVersionRaw>
+    <RepoVersion>$(_RepoVersionRaw.Trim())</RepoVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>$(RepoVersion)</Version>
+    <!-- Win32 버전 리소스는 4자리(x.y.z.r)를 요구한다. 리비전 자리는 쓰지 않으므로 0 고정. -->
+    <FileVersion>$(RepoVersion).0</FileVersion>
+    <AssemblyVersion>$(RepoVersion).0</AssemblyVersion>
+  </PropertyGroup>
+
+</Project>

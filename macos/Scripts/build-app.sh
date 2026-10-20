@@ -11,6 +11,9 @@
 # `--universal` 도 **전체 Xcode 없이 Command Line Tools 만으로** 돈다. 아키텍처별로 한 번씩
 # 빌드한 뒤 `lipo` 로 합치기 때문이다(아래 유니버설 분기의 주석 참고).
 #
+# 제품 버전은 저장소 루트 `VERSION` 파일에서 읽어 번들의 CFBundleShortVersionString 에 주입한다
+# (버전 단일 출처, SOO-28). 릴리스 때는 `VERSION` 만 고치면 된다.
+#
 # 산출물: macos/dist/HanyoungBadge.app
 set -euo pipefail
 
@@ -21,6 +24,8 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$PACKAGE_DIR/.." && pwd)"
+VERSION_FILE="$REPO_ROOT/VERSION"
 DIST_DIR="$PACKAGE_DIR/dist"
 APP_NAME="HanyoungBadge"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
@@ -29,6 +34,21 @@ EXECUTABLE_NAME="HanyoungBadgeApp"
 UNIVERSAL=0
 if [[ "${1:-}" == "--universal" ]]; then
     UNIVERSAL=1
+fi
+
+# 제품 버전은 저장소 루트 VERSION 파일에서만 읽는다(단일 출처, SOO-28). 번들 사본의
+# CFBundleShortVersionString 에 주입하므로 릴리스 때 고치는 파일은 VERSION 하나다.
+#
+# 빌드를 시작하기 **전에** 검사한다. 유니버설 빌드는 수 분이 걸리는데, 버전 주입 단계에서
+# 처음 실패하면 그 시간을 전부 버리게 된다.
+if [[ ! -f "$VERSION_FILE" ]]; then
+    echo "오류: 버전 단일 출처 파일이 없습니다: $VERSION_FILE" >&2
+    exit 1
+fi
+PRODUCT_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+if [[ ! "$PRODUCT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "오류: VERSION 이 x.y.z 형태가 아닙니다: '$PRODUCT_VERSION' ($VERSION_FILE)" >&2
+    exit 1
 fi
 
 cd "$PACKAGE_DIR"
@@ -181,6 +201,8 @@ cp "$BIN_PATH" "$APP_BUNDLE/Contents/MacOS/$EXECUTABLE_NAME"
 cp "$PACKAGE_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 # CFBundleVersion 을 빌드 시점 git SHA 로 덮어쓴다. 원본 Resources/Info.plist 는 건드리지 않는다.
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_ID" "$APP_BUNDLE/Contents/Info.plist"
+# CFBundleShortVersionString 도 같은 원칙으로 번들 사본에만 주입한다 — 출처는 루트 VERSION. [SOO-28]
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $PRODUCT_VERSION" "$APP_BUNDLE/Contents/Info.plist"
 printf 'APPL????' > "$APP_BUNDLE/Contents/PkgInfo"
 
 # 아이콘 리소스 (SOO-1319). 누락을 경고가 아니라 **실패**로 다루는 이유: 아이콘 없는 번들이
@@ -202,7 +224,7 @@ codesign --force --deep --sign - "$APP_BUNDLE"
 codesign --verify --verbose "$APP_BUNDLE"
 
 echo
-echo "완료: $APP_BUNDLE (빌드 $BUILD_ID)"
+echo "완료: $APP_BUNDLE (버전 $PRODUCT_VERSION, 빌드 $BUILD_ID)"
 echo "실행: open '$APP_BUNDLE'"
 echo "실기 QA 보고 시 메뉴 막대의 '빌드 $BUILD_ID' 를 함께 적어 주세요."
 echo "처음 실행 시 Gatekeeper 경고가 뜨면 README 의 '확인 후 열기' 절차를 따르세요."
