@@ -31,7 +31,6 @@ DIST_DIR="$PACKAGE_DIR/dist"
 APP_NAME="HanyoungBadge"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 VOLUME_NAME="$APP_NAME"
-SOURCE_PLIST="$PACKAGE_DIR/Resources/Info.plist"
 PLIST_BUDDY="/usr/libexec/PlistBuddy"
 
 UNIVERSAL=1
@@ -82,11 +81,24 @@ if [[ ! -d "$APP_BUNDLE" ]]; then
     exit 1
 fi
 
-# 버전은 반드시 Resources/Info.plist 에서 읽는다 — 파일명에 버전을 하드코딩하면
-# plist 를 올려도 산출물 이름이 옛 버전 그대로 남아 배포본을 잘못 식별하게 된다.
-VERSION="$("$PLIST_BUDDY" -c "Print :CFBundleShortVersionString" "$SOURCE_PLIST")"
+# 버전은 반드시 어딘가에서 **읽는다** — 파일명에 하드코딩하면 버전을 올려도 산출물 이름이
+# 옛 버전 그대로 남아 배포본을 잘못 식별하게 된다.
+#
+# 읽는 곳은 원본 Resources/Info.plist 가 아니라 **번들 사본**이다 (SOO-28). 버전의 단일
+# 출처는 저장소 루트 VERSION 파일이고 build-app.sh 가 그 값을 번들에 주입하므로, 원본
+# plist 에는 placeholder(0.0.0)만 남아 있다. 번들에서 읽으면 `--skip-build` 로 기존 번들을
+# 재사용할 때도 파일명이 실제 번들 내용과 어긋나지 않는다 — 원본을 읽으면 그 경우
+# 번들은 옛 버전인데 파일명은 새 버전으로 붙는다.
+VERSION="$("$PLIST_BUDDY" -c "Print :CFBundleShortVersionString" "$APP_BUNDLE/Contents/Info.plist")"
 if [[ ! "$VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
     echo "오류: CFBundleShortVersionString 이 비었거나 파일명에 쓸 수 없는 값입니다: '$VERSION'" >&2
+    exit 1
+fi
+# placeholder 그대로라면 build-app.sh 의 주입을 거치지 않은 번들이다. 그 상태로 DMG 를
+# 만들면 'HanyoungBadge-0.0.0-....dmg' 라는 쓸 수 없는 배포본이 조용히 나온다.
+if [[ "$VERSION" == "0.0.0" ]]; then
+    echo "오류: 번들의 CFBundleShortVersionString 이 placeholder(0.0.0)입니다." >&2
+    echo "      build-app.sh 를 거치지 않고 만든 번들로 보입니다. --skip-build 없이 다시 실행하세요." >&2
     exit 1
 fi
 

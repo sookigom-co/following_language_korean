@@ -146,19 +146,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y nsis icoutils
 
-      # 버전은 태그(refs/tags/vX.Y.Z)에서 뽑아 넘긴다. 저장소에 버전 단일 출처 파일
-      # (VERSION, SOO-28)이 생기면 태그와 그 파일이 어긋난 릴리스를 여기서 먼저 잡는다.
-      - name: 설치기 빌드
+      # 버전은 저장소 루트 VERSION 파일이 단일 출처다(SOO-28). 릴리스 절차는 "VERSION 을
+      # 올려 커밋 → 같은 값으로 vX.Y.Z 태그" 이므로, 태그와 파일이 어긋난 릴리스를 빌드
+      # 전에 여기서 잡는다. build.sh 에는 버전을 넘기지 않는다 — 넘기면 CI 가 두 번째
+      # 출처가 되어, 파일을 빠뜨린 릴리스가 태그 값으로 조용히 빌드된다.
+      - name: 태그 ↔ VERSION 일치 확인
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
-          if [ -f VERSION ]; then
-            file_version="$(tr -d '[:space:]' < VERSION)"
-            if [ "$tag_version" != "$file_version" ]; then
-              echo "ERROR: 태그 버전($tag_version)과 VERSION 파일($file_version)이 다릅니다." >&2
-              exit 1
-            fi
+          test -f VERSION || { echo "ERROR: 버전 단일 출처 파일이 없습니다: VERSION" >&2; exit 1; }
+          file_version="$(tr -d '[:space:]' < VERSION)"
+          if [ "$tag_version" != "$file_version" ]; then
+            echo "ERROR: 태그 버전($tag_version)과 VERSION 파일($file_version)이 다릅니다." >&2
+            echo "       릴리스 전에 VERSION 을 올려 커밋한 뒤 같은 값으로 태그하세요." >&2
+            exit 1
           fi
-          installer/build.sh "$tag_version"
+          echo "버전 확인: $file_version"
+
+      - name: 설치기 빌드
+        run: installer/build.sh
 
       - name: 설치기 + SHA256 매니페스트 업로드
         uses: actions/upload-artifact@v7

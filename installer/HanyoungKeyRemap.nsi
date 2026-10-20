@@ -1,5 +1,5 @@
 ; ============================================================================
-;  HanyoungKeyRemap (입력 언어 배지 오버레이) — NSIS 설치기  [v2.1.0, SOO-1277]
+;  HanyoungKeyRemap (입력 언어 배지 오버레이) — NSIS 설치기  [SOO-1277]
 ; ----------------------------------------------------------------------------
 ;  기능:
 ;    - 항상 관리자 권한으로 설치(RequestExecutionLevel admin)
@@ -12,14 +12,16 @@
 ;    - 언인스톨러: 태스크 삭제 + 파일/바로가기/앱 데이터 정리
 ;
 ;  Linux 크로스 빌드:
-;    makensis -DVERSION=2.1.0 -DSRCDIR=<publish_dir> installer/HanyoungKeyRemap.nsi
-;  (기본값은 리포 레이아웃 기준 상대경로 — installer/build.sh 참조)
+;    makensis -DVERSION=`cat VERSION` -DSRCDIR=<publish_dir> installer/HanyoungKeyRemap.nsi
+;  (SRCDIR/ICON/OUTFILE 기본값은 리포 레이아웃 기준 상대경로 — installer/build.sh 참조)
 ; ============================================================================
 
 Unicode true
 
+; VERSION 에는 기본값을 두지 않는다 — 버전의 단일 출처는 저장소 루트 VERSION 파일이고,
+; 여기에 사본을 두면 그 값이 낡아도 -DVERSION 에 가려져 평소에는 드러나지 않는다. [SOO-28]
 !ifndef VERSION
-  !define VERSION "2.1.0"
+  !error "VERSION 이 정의되지 않았습니다. installer/build.sh 로 빌드하거나 -DVERSION=<버전> 을 직접 넘기세요(단일 출처: 저장소 루트 VERSION 파일)."
 !endif
 
 ; 설치할 exe 가 있는 디렉터리(dotnet publish 결과). build.sh 가 -DSRCDIR 로 넘긴다.

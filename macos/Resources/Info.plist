@@ -24,8 +24,13 @@
 	<string>입력 언어 배지</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- 제품 버전 자리. 버전의 단일 출처는 저장소 루트 VERSION 파일이고,
+	     Scripts/build-app.sh 가 번들 사본에만 그 값을 써넣는다(원본인 이 파일은 건드리지 않는다).
+	     아래를 실제 버전으로 두지 않는 이유는 CFBundleVersion 과 같다 — 여기에 사본을 두면
+	     릴리스 때 VERSION 만 올리고 이 파일을 빠뜨린 순간 **조용히 어긋난 버전**이 배포된다.
+	     스크립트를 거치지 않고 만든 번들은 0.0.0 으로 남아 가짜 버전이 아님이 드러난다. [SOO-28] -->
 	<key>CFBundleShortVersionString</key>
-	<string>2.1.0</string>
+	<string>0.0.0</string>
 	<!-- 빌드 출처(provenance) 자리. Scripts/build-app.sh 가 번들 사본에만 git SHA 를 써넣고
 	     원본인 이 파일은 건드리지 않는다. 스크립트를 거치지 않고 만든 번들은 아래 값이 그대로
 	     남아 AppDelegate 가 '출처 불명' 으로 표시한다 — 가짜 빌드 번호를 남기지 않기 위함. -->
