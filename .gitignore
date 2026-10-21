@@ -26,3 +26,6 @@ dist/
 .build/
 .swiftpm/
 macos/dist/
+
+# Claude Code agent-local settings (keep on disk, never commit)
+.claude/
